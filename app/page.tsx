@@ -244,7 +244,7 @@ export default function Home() {
   const [authReady, setAuthReady] = useState(false);
   const [adminUserId, setAdminUserId] = useState<string | null>(null);
   const [authError, setAuthError] = useState("");
-  const [loginEmail, setLoginEmail] = useState("honores.link@gmail.com");
+  const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
   const [activeSection, setActiveSection] = useState("Resumen");
