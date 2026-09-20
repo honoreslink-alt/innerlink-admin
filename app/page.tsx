@@ -339,6 +339,19 @@ export default function Home() {
       }
 
       setAuthError("");
+      if (session) {
+  const { error: adminError } = await supabase.rpc("admin_list_users");
+
+  if (!active) return;
+
+  if (adminError) {
+    await supabase.auth.signOut();
+    setAuthError("Esta cuenta no tiene permisos de administrador.");
+    setAdminUserId(null);
+    setAuthReady(true);
+    return;
+  }
+}
       setAdminUserId(session?.user.id ?? null);
       setAuthReady(true);
     }
@@ -347,12 +360,10 @@ export default function Home() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!active) return;
-      setAuthError("");
-      setAdminUserId(session?.user.id ?? null);
-      setAuthReady(true);
-    });
+} = supabase.auth.onAuthStateChange(() => {
+  if (!active) return;
+  void comprobarSesion();
+});
 
     return () => {
       active = false;
@@ -709,7 +720,16 @@ export default function Home() {
       setLoginLoading(false);
       return;
     }
+const { error: adminError } = await supabase.rpc("admin_list_users");
 
+if (adminError) {
+  await supabase.auth.signOut();
+  setAdminUserId(null);
+  setAuthError("Esta cuenta no tiene permisos de administrador.");
+  setLoginPassword("");
+  setLoginLoading(false);
+  return;
+}
     setLoginPassword("");
     setLoginLoading(false);
   }
