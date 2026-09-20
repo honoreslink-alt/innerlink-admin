@@ -4,11 +4,8 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { supabase } from "../lib/supabase";
 
-// ╔══════════════════════════════════════════════════════════════════════╗
-// ║ TIGER: PEGA AQUÍ EL LINK DE YOUTUBE DEL VIDEO DE PRESENTACIÓN      ║
-// ║ Ejemplo: "https://www.youtube.com/watch?v=XXXXXXXXXXX"             ║
-// ╚══════════════════════════════════════════════════════════════════════╝
-const ADMIN_PRESENTATION_YOUTUBE_URL = "https://www.youtube.com/watch?v=yTFnPjrWAvM&list=RDyTFnPjrWAvM&start_radio=1";
+const DEFAULT_PRESENTATION_YOUTUBE_URL =
+  "https://www.youtube.com/watch?v=yTFnPjrWAvM&list=RDyTFnPjrWAvM&start_radio=1";
 
 const menuItems = [
   "Resumen",
@@ -238,9 +235,6 @@ function youtubeEmbedUrl(value: string) {
 }
 
 export default function Home() {
-  const presentationVideoUrl = youtubeEmbedUrl(
-    ADMIN_PRESENTATION_YOUTUBE_URL
-  );
   const [authReady, setAuthReady] = useState(false);
   const [adminUserId, setAdminUserId] = useState<string | null>(null);
   const [authError, setAuthError] = useState("");
@@ -314,10 +308,53 @@ export default function Home() {
     useState<AdminActivityStatsRow | null>(null);
   const [activityLoading, setActivityLoading] = useState(true);
   const [activityError, setActivityError] = useState("");
+  const [presentationYoutubeUrl, setPresentationYoutubeUrl] = useState(
+    DEFAULT_PRESENTATION_YOUTUBE_URL
+  );
+  const [presentationUrlDraft, setPresentationUrlDraft] = useState(
+    DEFAULT_PRESENTATION_YOUTUBE_URL
+  );
+  const [presentationSettingLoading, setPresentationSettingLoading] =
+    useState(true);
+  const [presentationSettingSaving, setPresentationSettingSaving] =
+    useState(false);
+  const [presentationSettingMessage, setPresentationSettingMessage] =
+    useState("");
+
+  const presentationVideoUrl = youtubeEmbedUrl(presentationYoutubeUrl);
 
 
 
 
+
+  useEffect(() => {
+    let active = true;
+
+    async function cargarVideoPresentacion() {
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select("setting_value")
+        .eq("setting_key", "presentation_youtube_url")
+        .maybeSingle();
+
+      if (!active) return;
+
+      const savedUrl = data?.setting_value?.trim();
+
+      if (!error && savedUrl) {
+        setPresentationYoutubeUrl(savedUrl);
+        setPresentationUrlDraft(savedUrl);
+      }
+
+      setPresentationSettingLoading(false);
+    }
+
+    void cargarVideoPresentacion();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
 
   useEffect(() => {
@@ -699,6 +736,39 @@ export default function Home() {
 
     setAdminUserId(null);
     setLoginPassword("");
+  }
+
+  async function guardarVideoPresentacion() {
+    const cleanUrl = presentationUrlDraft.trim();
+
+    setPresentationSettingMessage("");
+
+    if (!cleanUrl || !youtubeEmbedUrl(cleanUrl)) {
+      setPresentationSettingMessage(
+        "Pega un enlace válido de YouTube antes de guardar."
+      );
+      return;
+    }
+
+    setPresentationSettingSaving(true);
+
+    const { error } = await supabase.rpc("admin_set_app_setting", {
+      p_setting_key: "presentation_youtube_url",
+      p_setting_value: cleanUrl,
+    });
+
+    if (error) {
+      setPresentationSettingMessage(error.message);
+      setPresentationSettingSaving(false);
+      return;
+    }
+
+    setPresentationYoutubeUrl(cleanUrl);
+    setPresentationUrlDraft(cleanUrl);
+    setPresentationSettingMessage(
+      "Video guardado. La app utilizará este mismo enlace."
+    );
+    setPresentationSettingSaving(false);
   }
 
   async function iniciarSesion(event: FormEvent<HTMLFormElement>) {
@@ -3843,6 +3913,69 @@ if (adminError) {
           </div>
 
           <div className="mt-5">{renderModuleHero("Configuración")}</div>
+
+          <div className="mb-4 rounded-2xl border border-cyan-500/20 bg-[#06111f] p-5">
+            <div className="flex items-start justify-between gap-6">
+              <div>
+                <p className="text-xs font-bold tracking-[0.15em] text-cyan-300">
+                  VIDEO DE PRESENTACIÓN
+                </p>
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  Este enlace se comparte con el inicio de sesión y la creación
+                  de cuenta de la app.
+                </p>
+              </div>
+              <span className="rounded-full border border-cyan-500/20 bg-cyan-500/5 px-3 py-1 text-[10px] font-bold tracking-wider text-cyan-300">
+                SINCRONIZADO
+              </span>
+            </div>
+
+            <div className="mt-4 flex gap-3">
+              <input
+                type="url"
+                value={presentationUrlDraft}
+                onChange={(event) => {
+                  setPresentationUrlDraft(event.target.value);
+                  setPresentationSettingMessage("");
+                }}
+                placeholder="https://www.youtube.com/watch?v=..."
+                disabled={presentationSettingLoading || presentationSettingSaving}
+                className="min-w-0 flex-1 rounded-xl border border-cyan-500/20 bg-[#020812] px-4 py-3 text-sm text-slate-200 outline-none transition focus:border-cyan-400 disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={() => void guardarVideoPresentacion()}
+                disabled={presentationSettingLoading || presentationSettingSaving}
+                className="rounded-xl bg-cyan-400 px-6 py-3 text-sm font-bold text-[#020812] transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {presentationSettingSaving ? "Guardando…" : "Guardar video"}
+              </button>
+            </div>
+
+            {presentationSettingMessage && (
+              <p
+                className={`mt-3 text-xs ${
+                  presentationSettingMessage.startsWith("Video guardado")
+                    ? "text-emerald-400"
+                    : "text-rose-400"
+                }`}
+              >
+                {presentationSettingMessage}
+              </p>
+            )}
+
+            {youtubeEmbedUrl(presentationUrlDraft) && (
+              <div className="mt-4 overflow-hidden rounded-xl border border-white/5 bg-black">
+                <iframe
+                  className="aspect-video w-full"
+                  src={youtubeEmbedUrl(presentationUrlDraft)}
+                  title="Vista previa del video de presentación"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-2xl border border-cyan-500/15 bg-[#06111f] p-5">
